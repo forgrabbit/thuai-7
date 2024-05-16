@@ -1,4 +1,3 @@
-using System.Security.Cryptography.X509Certificates;
 using GameServer.GameController;
 using GameServer.GameLogic;
 
@@ -6,7 +5,6 @@ namespace GameServer.Connection;
 
 public partial class AgentServer
 {
-    public static int TickCount = 0;
     public void HandleAfterGameTickEvent(object? sender, AfterGameTickEventArgs e)
     {
         List<MapMessage.Wall> walls = new();
@@ -64,7 +62,6 @@ public partial class AgentServer
 
             if (player.PlayerArmor != null)
                 _current_armor_health = player.PlayerArmor.Health;
-
 
             // Add inventory
             foreach (IItem item in player.PlayerBackPack.Items)
@@ -130,10 +127,26 @@ public partial class AgentServer
             );
         }
 
-        // Append map message, supplies message, players info message, and safe zone message to _messageToPublish
-        if (TickCount % 100 == 0)
+        List<GrenadesMessage.Grenade> grenades = new();
+        foreach (Grenade grenade in e.Grenades)
         {
-            _messageToPublish.Enqueue(
+            grenades.Add(
+                new GrenadesMessage.Grenade
+                {
+                    ThrowTick = grenade.ThrowTick,
+                    EvaluatedPosition = new GrenadesMessage.Grenade.Position
+                    {
+                        X = grenade.EvaluatedPosition.x,
+                        Y = grenade.EvaluatedPosition.y
+                    }
+                }
+            );
+        }
+
+        // Append map message, supplies message, players info message, and safe zone message to _messageToPublish
+        if (e.CurrentTick % 100 == 0)
+        {
+            Publish(
                 new MapMessage
                 {
                     Length = e.GameMap.Height,
@@ -141,20 +154,21 @@ public partial class AgentServer
                 }
             );
         }
-        _messageToPublish.Enqueue(
+
+        Publish(
             new SuppliesMessage
             {
                 Supplies = new(supplies)
             }
         );
-        _messageToPublish.Enqueue(
+        Publish(
             new PlayersInfoMessage
             {
                 ElapsedTicks = e.CurrentTick,
                 Players = new(players)
             }
         );
-        _messageToPublish.Enqueue(
+        Publish(
             new SafeZoneMessage
             {
                 CenterOfCircle = new SafeZoneMessage.Center
@@ -165,7 +179,12 @@ public partial class AgentServer
                 Radius = e.GameMap.SafeZone.Radius
             }
         );
-        TickCount++;
+        Publish(
+            new GrenadesMessage
+            {
+                Grenades = new(grenades)
+            }
+        );
     }
 
     public void HandleAfterPlayerConnectEvent(object? sender, AfterPlayerConnect e)

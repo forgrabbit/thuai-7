@@ -1,10 +1,9 @@
-using System.Security.Principal;
 using GameServer.Geometry;
 using GameServer.Geometry.Shapes;
 
 namespace GameServer.GameLogic;
 
-public partial class Game : IGame
+public partial class Game
 {
     public void SubscribePlayerEvents(Player player)
     {
@@ -80,7 +79,6 @@ public partial class Game : IGame
                             return;
                         }
 
-                        GameMap.AddSupplies(playerIntX, playerIntY, ArmorFactory.ToItem(e.Player.PlayerArmor, 1));
                         e.Player.PlayerArmor = Armor.DefaultArmor;
                         break;
 
@@ -166,6 +164,12 @@ public partial class Game : IGame
             _logger.Error($"[Player {e.Player.PlayerId}] Cannot attack when the game is at stage {Stage}.");
             return;
         }
+        if (e.Player.LastSwitchArmTick is not null
+            && CurrentTick - e.Player.LastSwitchArmTick < Constant.PLAYER_FIREARM_PREPARATION_TICK)
+        {
+            _logger.Error($"[Player {e.Player.PlayerId}] Cannot attack instantly after switching arm.");
+            return;
+        }
 
         try
         {
@@ -178,13 +182,13 @@ public partial class Game : IGame
                 }
 
                 // Check if the type weapon requires bullets
-                if (e.Player.PlayerWeapon.RequiresBullet == true)
+                if (e.Player.PlayerWeapon.RequiredBulletNum > 0)
                 {
                     // Check if the player has enough bullets
                     IItem? bullet = e.Player.PlayerBackPack.FindItems(IItem.ItemKind.Bullet, Constant.Names.BULLET);
-                    if (bullet is null || bullet.Count <= 0)
+                    if (bullet is null || bullet.Count < e.Player.PlayerWeapon.RequiredBulletNum)
                     {
-                        _logger.Error($"[Player {e.Player.PlayerId}] No bullet.");
+                        _logger.Error($"[Player {e.Player.PlayerId}] No enough bullet.");
                         return;
                     }
 
@@ -288,7 +292,7 @@ public partial class Game : IGame
 
                         if (armorItem is null || armorItem.Count < e.Numb)
                         {
-                            _logger.Error($"[Player {e.Player.PlayerId}] Supply not found or no enough supplies.");
+                            _logger.Error($"[Player {e.Player.PlayerId}] No enough {e.TargetSupply}.");
                             return;
                         }
 
@@ -320,7 +324,7 @@ public partial class Game : IGame
                                     );
                         if (weaponItem is null || weaponItem.Count < e.Numb)
                         {
-                            _logger.Error($"[Player {e.Player.PlayerId}] Supply not found or no enough supplies.");
+                            _logger.Error($"[Player {e.Player.PlayerId}] No enough {e.TargetSupply}.");
                             return;
                         }
                         if (e.Player.WeaponSlot.Any(w => w.Name == e.TargetSupply) == true)
@@ -344,7 +348,7 @@ public partial class Game : IGame
 
                         if (generalItem is null || generalItem.Count < e.Numb)
                         {
-                            _logger.Error($"[Player {e.Player.PlayerId}] Supply not found or no enough supplies.");
+                            _logger.Error($"[Player {e.Player.PlayerId}] No enough {e.TargetSupply}.");
                             return;
                         }
 
@@ -418,6 +422,7 @@ public partial class Game : IGame
                     if (e.Player.WeaponSlot[i].Name == e.TargetFirearm)
                     {
                         e.Player.PlayerWeapon = e.Player.WeaponSlot[i];
+                        e.Player.LastSwitchArmTick = CurrentTick;
                         break;
                     }
                 }
