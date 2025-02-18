@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using TMPro;
 
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class Record : MonoBehaviour
@@ -25,7 +26,7 @@ public class Record : MonoBehaviour
         // 20 frame per second
         public const float FrameTime = 0.05f;
         public PlayState NowPlayState = PlayState.Pause;
-        public int NowTick = 0;
+        public int NowTick = 200;
         /// <summary>
         /// Now record serial number
         /// </summary>
@@ -72,6 +73,11 @@ public class Record : MonoBehaviour
     public RecordInfo _recordInfo;
 
     // GUI
+    private Button _backButton;
+    private Sprite _backButtonSprite;
+    private Button _showBorderButton;
+    private Sprite _showBorderButtonSprite;
+    private Sprite _hideBorderButtonSprite;
     private Button _stopButton;
     private Sprite _stopButtonSprite;
     private Sprite _continueButtonSprite;
@@ -92,6 +98,9 @@ public class Record : MonoBehaviour
     private GameObject _spotLight;
 
     private readonly List<GameObject> _obstaclePrefabs = new List<GameObject>();
+    private GameObject _borderPrefab;
+    private GameObject _borderParent;
+    // private readonly List<GameObject> _borders = new List<GameObject>();
     private readonly Dictionary<string, List<GameObject>> itemInstances = new Dictionary<string, List<GameObject>>();
     // record data
     private readonly string _recordFilePath = null;
@@ -161,6 +170,8 @@ private void Start()
         _obstaclePrefabs.Add(Resources.Load<GameObject>("Prefabs/Bush_01"));
         _obstaclePrefabs.Add(Resources.Load<GameObject>("Prefabs/Bush_02"));
 
+        _borderPrefab = Resources.Load<GameObject>("Square/Square");
+
         _currentTickText = GameObject.Find("Canvas/Tick").GetComponent<TMP_Text>();
 
         _poisonousCircle = GameObject.Find("PoisonousCircle").GetComponent<ParticleSystem>();
@@ -191,6 +202,8 @@ private void Start()
             { "Die", Resources.Load<AudioClip>("Music/Audio/die") },
             { "Grenade", Resources.Load<AudioClip>("Music/Audio/grenade") },
             { "Pickup", Resources.Load<AudioClip>("Music/Audio/pickup") },
+            { "Heal", Resources.Load<AudioClip>("Music/Audio/heal") },
+            { "Hurt", Resources.Load<AudioClip>("Music/Audio/hurt") }
         };
         _grenadeExplosionPrefab = Resources.Load<GameObject>("Prefabs/BigExplosionEffect");
         _grenadeBeamPrefab = Resources.Load<GameObject>("Beam/GrenadeBeam");
@@ -213,13 +226,39 @@ private void Start()
            }
            else if (_recordInfo.NowPlayState == PlayState.Pause)
            {
-               _stopButton.GetComponent<Image>().sprite = _stopButtonSprite;
-               _recordInfo.NowPlayState = PlayState.Play;
+                _stopButton.GetComponent<Image>().sprite = _stopButtonSprite;
+                _recordInfo.NowPlayState = PlayState.Play;
                 _recordInfo.NowTime = System.DateTime.Now.Ticks;
                 _as.PlayOneShot(_audioClipDict["Go"]);
            }
         });
 
+        _showBorderButton = GameObject.Find("Canvas/ShowBorderButton").GetComponent<Button>();
+        _showBorderButtonSprite = Resources.Load<Sprite>("GUI/Button/ShowButton");
+        _hideBorderButtonSprite = Resources.Load<Sprite>("GUI/Button/HideButton");
+        _showBorderButton.GetComponent<Image>().sprite = _showBorderButtonSprite;
+        _showBorderButton.onClick.AddListener(() =>
+        {
+            if (_borderParent.activeSelf)
+            {
+                _showBorderButton.GetComponent<Image>().sprite = _showBorderButtonSprite;
+                _borderParent.SetActive(false);
+            }
+            else
+            {
+                _showBorderButton.GetComponent<Image>().sprite = _hideBorderButtonSprite;
+                _borderParent.SetActive(true);
+            }
+        });
+
+        _backButton = GameObject.Find("Canvas/BackButton").GetComponent<Button>();
+        _backButtonSprite = Resources.Load<Sprite>("GUI/Button/BackButton");
+        _backButton.GetComponent<Image>().sprite = _backButtonSprite;
+        _backButton.onClick.AddListener(() =>
+        {
+            PlayerSource.Clear();
+            SceneManager.LoadScene("UI");
+        });
 
         _spotLight = GameObject.Find("Light");
 
@@ -384,6 +423,8 @@ private void Start()
         }
         // Randomly initialize the walls according to the _isWalls
         Transform obstacleParent = GameObject.Find("Map/Obstacles").transform;
+        _borderParent = GameObject.Find("Map/Borders");
+        _borderParent.SetActive(false);
         for (int i = 0; i < width; i++)
         {
             for (int j = 0; j < height; j++)
@@ -402,6 +443,8 @@ private void Start()
                         obstacle.transform.localScale.y* UnityEngine.Random.Range(1.0f,1.8f),
                         obstacle.transform.localScale.z* UnityEngine.Random.Range(0.7f,1.4f)
                     );
+                    GameObject newborder = Instantiate(_borderPrefab, new Vector3(i + 0.5f, 0f, j + 0.5f), Quaternion.identity);
+                    newborder.transform.SetParent(_borderParent.transform);
                 }
             }
         }
@@ -493,6 +536,19 @@ private void Start()
                 }
             }
             int health = player["health"].ToObject<int>();
+            Player nowPlayer = PlayerSource.GetPlayers()[playerId];
+            if(nowPlayer is not null)
+            {
+                if (nowPlayer.Health- health > 5)
+                {
+                    // Play hurt audio
+                    _as.PlayOneShot(_audioClipDict["Hurt"]);
+                }
+                if (health < 1 && !nowPlayer.IsDead)
+                {
+                    _as.PlayOneShot(_audioClipDict["Die"]);
+                }
+            }
             PlayerSource.UpdatePlayer(
                 playerId,
                 health,
@@ -517,16 +573,30 @@ private void Start()
                 playerPosition,
                 (float)player["firearm"]["distance"]
             );
-            infoString += $"<Player {(PlayerSource.GetPlayers()[playerId].Name.Length <= 6 ? PlayerSource.GetPlayers()[playerId].Name : PlayerSource.GetPlayers()[playerId].Name.Substring(0, 6) + "...") }> Health {health}\nPosition ({playerPosition.x:F2}, {playerPosition.y.ToString("F2")})\nInventory: ";
-            foreach(KeyValuePair<string, int> keyValue in inventory)
+            if (players.Count <= 2 || (_observe.cameraStatus == Observe.CameraStatus.player && playerId == _observe.PlayerNumber))
             {
-                infoString += $"{keyValue.Key} {keyValue.Value}; ";
+                infoString += $"<Player {(PlayerSource.GetPlayers()[playerId].Name.Length <= 6 ? PlayerSource.GetPlayers()[playerId].Name : PlayerSource.GetPlayers()[playerId].Name.Substring(0, 6) + "...") }> Health {health}\nPosition ({playerPosition.x:F2}, {playerPosition.y.ToString("F2")})\nInventory: ";
+                foreach(KeyValuePair<string, int> keyValue in inventory)
+                {
+                    infoString += $"{keyValue.Key} {keyValue.Value}; ";
+                }
+                infoString += "\n";
+                
+                infoString += $"Armor: {player["armor"]}\n";
+                infoString += $"Firearm: {player["firearm"]["name"]}\n";
+                if (player.ContainsKey("firearmsPool"))
+                {
+                    infoString += $"Firearm Pool: ";
+                    foreach (JObject firearm in (JArray)player["firearmsPool"])
+                    {
+                        infoString += $"{firearm["name"]}  ";
+                    }
+                    infoString += "\n";
+                }
+                infoString += $"Speed: {player["speed"]}\n";
+                infoString += $"-----------------------\n";
+                infoString += $"-----------------------\n";
             }
-            infoString += "\n";
-            
-            infoString += $"Armor: {player["armor"]}\n";
-            infoString += $"Firearm: {player["firearm"]["name"]}\n";
-            infoString += $"-----------------------\n";
         }
         _infoText.text = infoString;
     }
@@ -595,7 +665,17 @@ private void Start()
         int playerId = eventJson["data"]["playerId"].ToObject<int>();
         Position targetPosition = new Position((float)eventJson["data"]["turgetPosition"]["x"], (float)eventJson["data"]["turgetPosition"]["y"]);
         Player player = PlayerSource.GetPlayers()[playerId];
-        player.Attack(targetPosition, player.FirearmRange);
+
+        if (eventJson["data"]["range"] == null)
+        {
+            Debug.Log("Range is null!");
+            player.Attack(targetPosition, player.FirearmRange);
+        }
+        else
+        {
+            player.Attack(targetPosition, eventJson["data"]["range"].ToObject<float>());
+        }
+
         string firearmString = player.Firearm switch
         {
             FirearmTypes.S686 => "S686",
@@ -612,6 +692,7 @@ private void Start()
     private void AfterPlayerUseMedicineEvent(JObject eventJson)
     {
         int playerId = eventJson["data"]["playerId"].ToObject<int>();
+        _as.PlayOneShot(_audioClipDict["Heal"]);
         PlayerSource.GetPlayers()[playerId].UseMedicine();
     }
 
@@ -630,9 +711,8 @@ private void Start()
         GameObject beamPrefab = Instantiate(_grenadeBeamPrefab);
         Vector3 endPoint = new Vector3(x, 0, y) ;
         beamPrefab.transform.position = endPoint;
-        beamPrefab.GetComponentInChildren<MeshRenderer>().material.color = playerId == 0 ? Color.blue : Color.red;
+        beamPrefab.GetComponentInChildren<MeshRenderer>().material.color = PlayerSource.GetPlayers()[playerId].playerColor;
         beamPrefab.GetComponent<BeamAnimations>().Blink(5.0f);
-        
     }
 
     private void AfterGrenadeExplosionEvent(JObject eventJson)
@@ -672,13 +752,22 @@ private void Start()
         }
 
         int recordTick = _recordInfo.NowTick;
-        while (recordTick == _recordInfo.NowTick) { 
+
+        while (recordTick == _recordInfo.NowTick) {
+
             if (_recordArray[_recordInfo.NowRecordNum].Value<string>("currentTicks") != null &&
                 _recordArray[_recordInfo.NowRecordNum]["messageType"].ToString() == "COMPETITION_UPDATE")
             {
+
                 //Debug.Log(_recordArray[_recordInfo.NowRecordNum]["currentTicks"].ToString());
-                UpdatePlayers((JArray)_recordArray[_recordInfo.NowRecordNum]["data"]["players"]);
                 _recordInfo.NowTick = (int)(_recordArray[_recordInfo.NowRecordNum]["currentTicks"]);
+                //if (_recordInfo.NowTick < 200)
+                //{
+                //_recordInfo.NowRecordNum++;
+                //    continue;
+                //}
+                UpdatePlayers((JArray)_recordArray[_recordInfo.NowRecordNum]["data"]["players"]);
+
                 _currentTickText.text = $"{_recordInfo.NowTick}";
                 JArray events = (JArray)_recordArray[_recordInfo.NowRecordNum]["data"]["events"];
                 if (events != null)
@@ -730,16 +819,10 @@ private void Start()
             }
             _recordInfo.NowRecordNum++;
         }
-        //}
-        //catch
-        //{
-
-        //}
     }
 
     private void FixedUpdate()
     {
-
         if (!(_recordInfo.NowPlayState == PlayState.Play && _recordInfo.NowTick < _recordInfo.MaxTick))
         {
             return;

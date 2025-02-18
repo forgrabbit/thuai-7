@@ -5,6 +5,100 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] - 2024-05-24
+
+### Fixed
+
+- Bug in client.
+
+## [2.4.0] - 2024-05-24
+
+### Added
+
+- More audios in client.
+
+## [2.3.1] - 2024-05-23
+
+### Fixed
+
+- Bug of buttons in client.
+
+## [2.3.0] - 2024-05-21
+
+### Added
+
+- Add back button and button to show obstacle boundaries in client.
+
+### Fixed
+
+- Bugs in record loading in client.
+
+## [2.2.0] - 2024-05-20
+
+### Changed
+
+- Wall generation.
+
+### Fixed
+
+- Some problems.
+
+## [2.1.0] - 2024-05-20
+
+### Changed
+
+- The shape of obstacles in map generation.
+
+### Fixed
+
+- Cancel sending and receiving task when closing a connection.
+
+## [2.0.5] - 2024-05-18
+
+### Fixed
+
+- Bug of bullet consumption.
+
+## [2.0.4] - 2024-05-18
+
+### Fixed
+
+- Supply generation.
+
+## [2.0.3] - 2024-05-18
+
+### Fixed
+
+- Supply type generation probability.
+
+## [2.0.2] - 2024-05-18
+
+### Fixed
+
+- Supply generation rules.
+- Jump punch damage.
+
+## [2.0.1] - 2024-05-17
+
+### Fixed
+
+- Camera bug in client.
+
+## [2.0.0] - 2024-05-16
+
+### Added
+
+- Fuzzy position of grenades.
+
+### Changed
+
+- Movement calculation.
+- Optimize performance.
+
+### Fixed
+
+- Possible trap in an obstacle.
+
 ## [1.4.1] - 2024-05-15
 
 ### Fixed
@@ -200,6 +294,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing.
 
+[2.4.1]: https://github.com/thuasta/thuai-7/compare/v2.4.0...v2.4.1
+[2.4.0]: https://github.com/thuasta/thuai-7/compare/v2.3.1...v2.4.0
+[2.3.1]: https://github.com/thuasta/thuai-7/compare/v2.3.0...v2.3.1
+[2.3.0]: https://github.com/thuasta/thuai-7/compare/v2.2.0...v2.3.0
+[2.2.0]: https://github.com/thuasta/thuai-7/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/thuasta/thuai-7/compare/v2.0.5...v2.1.0
+[2.0.5]: https://github.com/thuasta/thuai-7/compare/v2.0.4...v2.0.5
+[2.0.4]: https://github.com/thuasta/thuai-7/compare/v2.0.3...v2.0.4
+[2.0.3]: https://github.com/thuasta/thuai-7/compare/v2.0.2...v2.0.3
+[2.0.2]: https://github.com/thuasta/thuai-7/compare/v2.0.1...v2.0.2
+[2.0.1]: https://github.com/thuasta/thuai-7/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/thuasta/thuai-7/compare/v1.4.1...v2.0.0
+[1.4.1]: https://github.com/thuasta/thuai-7/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/thuasta/thuai-7/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/thuasta/thuai-7/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/thuasta/thuai-7/compare/v1.3.0...v1.3.1

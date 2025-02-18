@@ -192,12 +192,18 @@ public partial class Game
                         return;
                     }
 
-                    e.Player.PlayerBackPack.RemoveItems(IItem.ItemKind.Bullet, Constant.Names.BULLET, 1);
+                    e.Player.PlayerBackPack.RemoveItems(
+                        IItem.ItemKind.Bullet,
+                        Constant.Names.BULLET,
+                        e.Player.PlayerWeapon.RequiredBulletNum
+                    );
                 }
 
                 // Attack the target
                 List<Position>? bulletDirections
                     = e.Player.PlayerWeapon.GetBulletDirections(e.Player.PlayerPosition, e.TargetPosition);
+                double realRange = e.Player.PlayerWeapon.Range;
+
                 // Traverse all bullets
                 if (bulletDirections != null)
                 {
@@ -206,6 +212,7 @@ public partial class Game
                         Position start = e.Player.PlayerPosition;
                         Position end = start + normalizedDirection * e.Player.PlayerWeapon.Range;
                         Position realEnd = GameMap.GetRealEndPositon(start, end);
+                        realRange = Math.Min(realRange, Position.Distance(start, realEnd));
 
                         foreach (Player targetPlayer in AllPlayers)
                         {
@@ -236,7 +243,8 @@ public partial class Game
                         {
                             x = e.TargetPosition.x,
                             y = e.TargetPosition.y
-                        }
+                        },
+                        range = realRange,
                     }
                 };
 

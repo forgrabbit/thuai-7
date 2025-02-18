@@ -1,19 +1,27 @@
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 public class Observe : MonoBehaviour
 {
     public float RotateSpeed;
     public float MoveSpeed;
+    public float FreeMoveSpeed;
     public const float FreeMaxPitch = 80;
-    public enum CameraStatus {freeCamera=0,player};
-    public CameraStatus _cameraStatus;
-    public Player _target;//目标物体
+    public enum CameraStatus {freeCamera=0, player};
+    public CameraStatus cameraStatus {get; private set;}
+    public Player _target;
     private List<Player> _players;
     public UnityEngine.Transform initialTransform;
-    private int _playerNumber;
-    Vector3 offset;//相机跟随的偏移量
-    public float rotationSpeed;//摄像机旋转速度
+    public int PlayerNumber {get; private set; }
+    Vector3 offset;
+    public float rotationSpeed;
+    public Vector3 velocity = Vector3.zero;
+    public Vector3 lookatPositionvelocity = Vector3.zero;
+    public Vector3 lookatPosition;
+
     void Start()
     {
         offset = new Vector3(5, 5, 5);
@@ -21,20 +29,15 @@ public class Observe : MonoBehaviour
         _players = new();
         RotateSpeed = 100f;
         rotationSpeed = 75f;
-        MoveSpeed = 10f;
-        _cameraStatus = CameraStatus.freeCamera;
+        MoveSpeed = 0.1f;
+        FreeMoveSpeed = 10f;
+        cameraStatus = CameraStatus.freeCamera;
         _target = null;
-        //保证摄像机看向目标物体，且z轴旋转度是0
-        // transform.position = _target.playerObj.transform.position - offset;
-        //transform.LookAt(_target.playerObj.transform.position);
-        //transform.eulerAngles = new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, 0);
-        //得到摄像机与物体之间的初始偏移量
-
     }
 
     void Update()
     {
-        if (_cameraStatus == CameraStatus.player)
+        if (cameraStatus == CameraStatus.player)
         {
             Rotate();
             Rollup();
@@ -46,72 +49,86 @@ public class Observe : MonoBehaviour
             Move();
             ExchangeStatus();
         }
-
     }
-    void visualAngleReset()
+    void visualAngleReset(Vector3 from, Vector3 to)
     {
-        offset = new Vector3(-5, 5, -5);
-        transform.position = _target.playerObj.transform.position + offset;
-        transform.LookAt(new Vector3(_target.playerObj.transform.position.x, _target.playerObj.transform.position.y+1.5f, _target.playerObj.transform.position.z));
-        //transform.eulerAngles = new Vector3(initialTransform.eulerAngles.x, initialTransform.eulerAngles.y, 0);
+        offset = (from - to) * 8 / (from - to).magnitude;
     }
-    //摄像机跟随、滚轮缩放功能:
+
     void ExchangeStatus()
     {
         if (Input.GetMouseButtonDown(0))
         {
+
+            PointerEventData pointerEventData = new PointerEventData(EventSystem.current)
+            {
+                position = Input.mousePosition
+            };
+            List<RaycastResult> results = new List<RaycastResult>();
+
+            EventSystem.current.RaycastAll(pointerEventData, results);
+
+            foreach (RaycastResult result in results)
+            {
+                if (result.gameObject.GetComponent<Button>() != null)
+                {
+                    return;
+                }
+            }
+
             Dictionary<int ,Player> dict= PlayerSource.GetPlayers();
             _players.Clear();
             foreach (KeyValuePair<int, Player> player in dict)
             {
                 _players.Add(player.Value);
-            }
-            if(_cameraStatus == CameraStatus.player)
+            } 
+            if(cameraStatus == CameraStatus.player)
             {
                 // Retry target
-                if (_players.Count-1 >= _playerNumber)
+                if (_players.Count - 1 > PlayerNumber)
                 {
-                    _target = _players[_playerNumber];
+                    PlayerNumber++;
+                    _target = _players[PlayerNumber];
                     Debug.Log(transform.position);
                     Debug.Log($"target {_target.playerObj.transform.position}");
-                    visualAngleReset();
+                    visualAngleReset(transform.position, GetHeadPos(_target.playerObj.transform.position));
                     Debug.Log($"after {transform.position}");
-                    _playerNumber += 1;
                 }
                 else
                 {
-                    _cameraStatus = CameraStatus.freeCamera;
-                    _playerNumber = 0;
+                    PlayerNumber = -1;
+                    cameraStatus = CameraStatus.freeCamera;
                 }
 
             }
-            else if(_cameraStatus == CameraStatus.freeCamera && _players.Count !=0)
+            else if(cameraStatus == CameraStatus.freeCamera && _players.Count != 0)
             {
-                _cameraStatus = CameraStatus.player;
-                _target = _players[_playerNumber];
-                visualAngleReset();
-                _playerNumber += 1;
+                PlayerNumber++;
+                cameraStatus = CameraStatus.player;
+                _target = _players[PlayerNumber];
+                //Vector3 newOffset = GetHeadPos(_target.playerObj.transform.position) - transform.position;
+                //newOffset *= 8 / newOffset.magnitude;
+                Debug.Log(_target == null ? "Target is null" : "Target is not null");
+                visualAngleReset(transform.position, GetHeadPos(_target.playerObj.transform.position));
             }
         }
     }
-    public float zoomSpeed = 1f; // 视野的缩放速度
-    float zoom;//滚轮滚动量
+    public float zoomSpeed = 1f;
+    float zoom;
     void Follow()
     {
-        //视野缩放
-        zoom = Input.GetAxis("Mouse ScrollWheel") * zoomSpeed; // 获取滚轮滚动量
-        if (zoom != 0) // 如果有滚动
+        zoom = Input.GetAxis("Mouse ScrollWheel") * zoomSpeed;
+        if (zoom != 0)
         {
             offset -= zoom * offset;
         }
-        //镜头跟随
-        transform.LookAt(GetHeadPos(_target.playerObj.transform.position));
-
-        transform.position = GetHeadPos(_target.playerObj.transform.position) - offset;
-
+        //锟斤拷头锟斤拷锟斤拷
+       Vector3 headPosition = GetHeadPos(new Vector3(_target.PlayerPosition.x, 0f, _target.PlayerPosition.y));
+        transform.position = Vector3.SmoothDamp(transform.position, headPosition + offset, ref velocity, MoveSpeed);
+        lookatPosition = Vector3.SmoothDamp(lookatPosition, headPosition, ref lookatPositionvelocity, MoveSpeed);
+        transform.LookAt(lookatPosition);
+        // transform.position = GetHeadPos(_target.playerObj.transform.position) - offset;
     }
-
-    //左右旋转、上下旋转功能:
 
 
     public bool isRotating, lookup;
@@ -123,46 +140,26 @@ public class Observe : MonoBehaviour
     }
     void Rotate()
     {
-        /*if (Input.GetMouseButtonDown(1))//长按鼠标右键
-        {
-            isRotating = true;
-        }
-        if (Input.GetMouseButtonUp(1))
-        {
-            isRotating = false;
-        }*/
         isRotating = true;
         if (isRotating)
         {
-            //得到鼠标x方向移动距离
             mousex = Input.GetAxis("Mouse X") * rotationSpeed * Time.deltaTime;
-            //旋转轴的位置是目标物体处，方向是世界坐标系的y轴
 
             transform.RotateAround(GetHeadPos(_target.playerObj.transform.position), Vector3.up, mousex);
-            //每次旋转后更新偏移量
-            offset = GetHeadPos(_target.playerObj.transform.position) - transform.position;
+            offset = Quaternion.AngleAxis(mousex, Vector3.up) * offset;
+            //offset = GetHeadPos(_target.playerObj.transform.position) - transform.position;
         }
     }
     void Rollup()
     {
-        /*if (Input.GetMouseButtonDown(2))//长按鼠标中键
-        {
-            lookup = true;
-        }
-        if (Input.GetMouseButtonUp(2))
-        {
-            lookup = false;
-        }*/
         lookup = true;
         if (lookup)
         {
-            //得到鼠标y方向移动距离
             mousey = -Input.GetAxis("Mouse Y") * rotationSpeed * Time.deltaTime;
-            //旋转轴的位置在目标物体处，方向是摄像机的x轴
+
             if (Mathf.Abs(transform.rotation.x + mousey-initialTransform.rotation.x) > 90) mousey = 0;
             transform.RotateAround(GetHeadPos(_target.playerObj.transform.position), transform.right, mousey);
-            //每次旋转后更新偏移量
-            offset = GetHeadPos(_target.playerObj.transform.position) - transform.position;
+            offset = Quaternion.AngleAxis(mousey, transform.right) * offset;
         }
 
     }
@@ -177,25 +174,25 @@ public class Observe : MonoBehaviour
             Vector3 fowardVector = transform.forward;
             fowardVector = new Vector3(fowardVector.x, 0, fowardVector.z).normalized;
             // move forward
-            transform.Translate(MoveSpeed * Time.deltaTime * vertical * fowardVector, Space.World);
+            transform.Translate(FreeMoveSpeed * Time.deltaTime * vertical * fowardVector, Space.World);
         }
         if (Mathf.Abs(horizontal) > 0.01)
         {
             Vector3 rightVector = transform.right;
             rightVector = new Vector3(rightVector.x, 0, rightVector.z).normalized;
             // move aside 
-            transform.Translate(MoveSpeed * Time.deltaTime * horizontal * rightVector, Space.World);
+            transform.Translate(FreeMoveSpeed * Time.deltaTime * horizontal * rightVector, Space.World);
         }
 
         // Fly up if space is clicked
         if (Input.GetKey(KeyCode.Space))
         {
-            transform.Translate(MoveSpeed * Time.deltaTime * Vector3.up, Space.World);
+            transform.Translate(FreeMoveSpeed * Time.deltaTime * Vector3.up, Space.World);
         }
         // Fly down if left shift is clicked
         if (Input.GetKey(KeyCode.LeftShift))
         {
-            transform.Translate(MoveSpeed * Time.deltaTime * Vector3.down, Space.World);
+            transform.Translate(FreeMoveSpeed * Time.deltaTime * Vector3.down, Space.World);
         }
 
     }

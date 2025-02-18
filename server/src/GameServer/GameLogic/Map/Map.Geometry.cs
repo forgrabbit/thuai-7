@@ -94,8 +94,8 @@ public partial class Map
         {
             Position a = new(startPosition.x, startPosition.y);
             Position b = new(expectedEndPosition.x, expectedEndPosition.y);
-            Position firstHitX = new(a.x, a.y);
-            Position firstHitY = new(a.x, a.y);
+            Position firstHitX = new(b.x, b.y);
+            Position firstHitY = new(b.x, b.y);
 
             int deltaX = (direction.x > 0) ? 0 : -1;
             int deltaY = (direction.y > 0) ? 0 : -1;
@@ -124,7 +124,7 @@ public partial class Map
                     double x = k * (y - a.y) + a.x;
                     if (GetBlock(x, y + offset + deltaY) is null || GetBlock(x, y + offset + deltaY)?.IsWall == true)
                     {
-                        firstHitY = new Position(x, y) - direction * diseps;;
+                        firstHitY = new Position(x, y) - direction * diseps;
                         break;
                     }
                 }

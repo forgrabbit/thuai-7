@@ -10,6 +10,8 @@ namespace GameServer;
 
 class Program
 {
+    const int TIMEOUT_EXIT_CODE = 2;
+
     const string SerilogTemplate
         = "[{@t:HH:mm:ss.fff} {@l:u3}] {#if Component is not null}{Component,-13} {#end}{@m}\n{@x}";
     const string SerilogFileOutputTemplate
@@ -50,7 +52,7 @@ class Program
                 _logger.Error(
                     $"GameServer has been running for {config.MaxRunningSeconds} seconds. Stopping..."
                 );
-                Environment.Exit(1);
+                Environment.Exit(TIMEOUT_EXIT_CODE);
             }
         );
 
@@ -85,23 +87,35 @@ class Program
             agentServer.Start();
 
             bool allConnected = false;
+            bool forceStart = false;
 
             Task.Run(() =>
             {
                 Task.Delay(config.ConnectionLimitTime * 1000).Wait();
                 if (allConnected == false)
                 {
-                    _logger.Error(
-                        $"Connected clients are not enough. Stopping..."
-                    );
-                    Environment.Exit(1);
+                    if (useWhiteList == true)
+                    {
+                        _logger.Warning(
+                            $"Connected clients are not enough. Force starting the game with {allTokens.Count} players..."
+                        );
+                        gameRunner.AllocatePlayer(allTokens);
+                        forceStart = true;
+                    }
+                    else
+                    {
+                        _logger.Error(
+                            $"Connected clients are not enough. Stopping..."
+                        );
+                        Environment.Exit(TIMEOUT_EXIT_CODE);
+                    }
                 }
             });
 
-            // Wait for players to connect
+            // Wait for players to connect or until force start
             Task.Delay(config.QueueTime * 1000).Wait();
 
-            while (gameRunner.Game.PlayerCount < config.PlayerCount)
+            while (gameRunner.Game.PlayerCount < config.PlayerCount && forceStart == false)
             {
                 _logger.Information(
                     $"Waiting for {config.PlayerCount - gameRunner.Game.PlayerCount} more players to join..."
